@@ -277,7 +277,7 @@ def main():
 
 # Program Start Point
 '''TODO: add the following line below the to the file /etc/rc.local
-    python /root/usr/ECB Road Test.py
+    python /root/usr/ECB_road_test_program/ECB Road Test.py
 '''
 logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 # Call the main program
