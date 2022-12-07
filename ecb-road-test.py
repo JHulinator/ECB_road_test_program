@@ -5,6 +5,7 @@ from Phidget22.Devices.DigitalOutput import *
 import time
 from datetime import datetime, timedelta
 import logging
+import traceback
 # endregion End Imports ------------------------------------------------------
 
 # region Global Variables ----------------------------------------------------
@@ -156,11 +157,11 @@ def getPhidgetName(phidget: Phidget) -> str:
         elif phidget.getHubPort() == 1:
             return 'Downstream'
     else:
-        if id == 0:
+        if id == 1:
             return 'Inflation'
-        elif id == 1:
-            return 'Deflation'
         elif id == 2:
+            return 'Deflation'
+        elif id == 0:
             return 'LED'
 
 
@@ -214,11 +215,11 @@ def main():
     viDownstream.setHubPort(1)  # Set to VINT port for downstream pressure transducer
     viDownstream.setIsHubPortDevice(True)
     doInflation.setHubPort(2)  # Set the VINT port that the relay is connected to
-    doInflation.setChannel(0)  # Set the channel on the relay module that the Inflation solenoid is connected to
+    doInflation.setChannel(1)  # Set the channel on the relay module that the Inflation solenoid is connected to
     doDeflation.setHubPort(2)  # Set the VINT port that the relay is connected to
-    doDeflation.setChannel(1)  # Set the channel on the relay module that the Deflation solenoid is connected to
+    doDeflation.setChannel(2)  # Set the channel on the relay module that the Deflation solenoid is connected to
     doLight.setHubPort(2)  # Set the VINT port that the relay is connected to
-    doLight.setChannel(2)  # Set the channel on the relay module that the Warning Light is connected to
+    doLight.setChannel(0)  # Set the channel on the relay module that the Warning Light is connected to
     
     print(f'Upstream = [{viUpstream.getHubPort()}, {viUpstream.getChannel()}]\n\
             Downstream = [{viDownstream.getHubPort()}, {viDownstream.getChannel()}]\n\
@@ -275,11 +276,47 @@ def main():
     logging.info('Program endded at: ' + str(datetime.now()))
 # endregion Programing Routines ----------------------------------------------
 
+# region for testing ---------------------------------------------------------
+def bootTest():
+    try:
+        print("Boot test started!")
+        logging.info('Boot test started at: ' + str(datetime.now()))
+        light = DigitalOutput()
+
+        light.setHubPort(2)
+        light.setChannel(0)
+
+        light.openWaitForAttachment(3000)
+        
+        # Flash light to let user know that the program has started
+        light.openWaitForAttachment(3000)
+        onTimeSec = 0.05
+        offTimeSec = 0.05
+        blinkNumber = 10
+        for n in range(0,blinkNumber):
+            light.setState(True)  # Turn on
+            time.sleep(onTimeSec)  # Wait on
+            light.setState(False)  # Turn off
+            if n < blinkNumber:
+                time.sleep(offTimeSec)  # Wait off
+    except PhidgetException as ex:
+        traceback.print_exc()
+        message = "PhidgetException " + str(ex.code) + " (" + ex.description + "): " + ex.details
+        print(message)
+        logging.debug(message)
+
+    print("boot test compleate")
+    logging.debug("boot test compleate")
+
+# endregion for testing ------------------------------------------------------
+
+
 # Program Start Point
 '''TODO: add the following line below the to the file /etc/rc.local
     python /root/usr/ECB_road_test_program/ECB Road Test.py
 '''
-logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+logging.basicConfig(filename='app.log', filemode='a', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 # Call the main program
-main()
+# main()
+bootTest()
 # Program End
