@@ -90,7 +90,7 @@ def onVoltageChange(self: VoltageInput, voltage):
     isNotOpenedSixHundredSecounds = not ((stateDuration.total_seconds() > 600) \
         and inflationSolenoid.getState())
     isNotDeflating = not deflationSolenoid.getState()
-    isSupplyHigher = upstreamPressure > SET_PRESSURE + 5.0
+    isSupplyHigher = upstreamPressure > downstreamPressure + 5.0
     # If all of the above conditions are true, then open inflation
     shouldOpenInflation = haveValidPressureValues and isTankLow and \
         isClosedTreeSecounds and isNotOpenedSixHundredSecounds and \
