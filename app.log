@@ -1,1 +1,10 @@
 
+root - INFO - Boot test started at: 2022-12-06 23:00:05.245752
+root - DEBUG - PhidgetException 3 (Timed Out): No Phidgets were detected at all. Make sure your device is attached.
+root - DEBUG - boot test compleate
+root - INFO - Boot test started at: 2022-12-06 23:00:54.311450
+root - DEBUG - PhidgetException 3 (Timed Out): No Phidgets were detected at all. Make sure your device is attached.
+root - DEBUG - boot test compleate
+root - INFO - Boot test started at: 2022-12-06 23:04:08.700069
+root - DEBUG - PhidgetException 3 (Timed Out): No Phidgets were detected at all. Make sure your device is attached.
+root - DEBUG - boot test compleate

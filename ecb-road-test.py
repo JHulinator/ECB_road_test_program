@@ -196,7 +196,7 @@ def main():
     '''This is the main programing loop that runs continually'''
     print('Main program has started')
     logging.info('Program started at: ' + str(datetime.now()))
-
+    
     # Initiate the Phidgets code object
     viUpstream = VoltageInput()
     viDownstream = VoltageInput()
@@ -317,6 +317,6 @@ def bootTest():
 '''
 logging.basicConfig(filename='app.log', filemode='a', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 # Call the main program
-# main()
-bootTest()
+main()
+# bootTest()
 # Program End
