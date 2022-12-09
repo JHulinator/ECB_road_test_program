@@ -230,13 +230,15 @@ def shouldInflate(inflationState:bool, inflationChangeTime:datetime, upstreamPre
         condition2 = (datetime.now() - inflationChangeTime).total_seconds() > 3.0
         condition3 = not deflation
         condition4 = upstreamPressure > downstreamPressure + 5.0
-        message = f'Evaluation to start inflation made = condition1:{condition1} and condition2:{condition2} and condition3:{condition3} and condition4:{condition4} = {condition1 and condition2 and condition4}'
+        # message = f'Evaluation to start inflation made = condition1:{condition1} and condition2:{condition2} and condition3:{condition3} and condition4:{condition4} = {condition1 and condition2 and condition4}'
+        message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = {tankPressure}'
         print(message)
         return condition1 and condition2 and condition3 and condition4
     else:
         condition1 = (datetime.now() - inflationChangeTime).total_seconds() > 600.0
         condition2 = tankPressure >= SET_PRESSURE
-        message = f'Evaluation to stop inflation made = condition1:{condition1} or condition2:{condition2} = {condition1 and condition2}'
+        # message = f'Evaluation to stop inflation made = condition1:{condition1} or condition2:{condition2} = {condition1 and condition2}'
+        message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = {tankPressure}'
         print(message)
         return not (condition1 or condition2)
 
