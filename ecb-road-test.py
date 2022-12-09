@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timedelta
 import logging
 import traceback
+import sys
 # endregion End Imports ------------------------------------------------------
 
 # region Global Variables ----------------------------------------------------
@@ -46,7 +47,8 @@ CORRECTION_CONST1 = 1.43
 CORRECTION_CONST2 = -0.43
 CORRECTION_CONST3 = 0.2
 
-allChannelsAttached = False
+allChannelsAttached = False  # This is set to true when all channels have been attached
+writeVoltageToOutputs = True  # If true voltages will be output on the extra channels, defaults to true but can be overwrten by passing False as the first arg when this script is called
 # endregion Global Variables -------------------------------------------------
 
 # region Event Handlers ------------------------------------------------------
@@ -103,21 +105,26 @@ def onVoltageChange(self: VoltageInput, voltage):
             print(msg)
             logging.debug(msg)
 
-        # Determine if inflation solenoid should be opened
-        inflateNeeded = shouldInflate(\
-                        inflationState=inflationState,\
-                        inflationChangeTime=inflationStateTime,\
-                        upstreamPressure=upstreamPressure,\
-                        downstreamPressure=downstreamPressure,\
-                        tankPressure=tankPressure
-                        )
-        solenoidToggle(inflationSolenoid, inflateNeeded)
-        
-        # TODO: Determine if the deflation solenoid should be opened
+        # Make sure we have meaningful data
+        if (downstreamPressure != 0.0) and (upstreamPressure != 0.0):
+            # Determine if inflation solenoid should be opened
+            inflateNeeded = shouldInflate(\
+                            inflationState=inflationState,\
+                            inflationChangeTime=inflationStateTime,\
+                            upstreamPressure=upstreamPressure,\
+                            downstreamPressure=downstreamPressure,\
+                            tankPressure=tankPressure
+                            )
+            solenoidToggle(inflationSolenoid, inflateNeeded)
+            
+            # TODO: Determine if the deflation solenoid should be opened
 
-        # TODO: Determine if the warning light should be on
-        warningLightNeeded = tankPressure < SET_PRESSURE*0.9
-        solenoidToggle(warningLight, warningLightNeeded)
+            # TODO: Determine if the warning light should be on
+            warningLightNeeded = tankPressure < SET_PRESSURE*0.9
+            solenoidToggle(warningLight, warningLightNeeded)
+
+            if writeVoltageToOutputs:
+                writeOutputs(upstreamPressure, downstreamPressure, tankPressure)
         
 
 
@@ -215,6 +222,7 @@ def shouldInflate(inflationState:bool, inflationChangeTime, upstreamPressure:flo
         print(message)
         return not (condition1 or condition2)
 
+
 def shouldDeflate() -> bool:
     # This method determine if the inflation should be opened
     '''
@@ -229,16 +237,38 @@ def shouldDeflate() -> bool:
     '''
     pass
 
+
 def shouldWarn():
     # This method determine if the inflation should be opened
     pass
+
+
+def writeOutputs(upstream:float, downstream:float, tank:float):
+    try:
+        outUp = digitalOutputs[3]
+        outDown = digitalOutputs[4]
+        outTank = digitalOutputs[5]
+        if upstream > 0.0:
+            outUp.setDutyCycle(upstream / 150.0)
+        else:
+            outUp.setDutyCycle(0.0)
+        if downstream > 0.0:
+            outDown.setDutyCycle(downstream / 150.0)
+        else: 
+            outDown.setDutyCycle(0.0)
+        if outTank > 0.0:
+            outTank.setDutyCycle(tank / 150.0)
+        else:
+            outTank.setDutyCycle(0.0)
+    except:
+        pass
 # endregion Helper Functions -------------------------------------------------
 
 # region Programing Routines -------------------------------------------------
 def main():
     '''This is the main programing loop that runs continually'''
-    print('Main program has started')
-    logging.info('Program started at: ' + str(datetime.now()))
+    print(f'Main program has started with arguments: {sys.argv}')
+    logging.info(f'Program started at: {datetime.now()} with args: {str(sys.argv)}')
     
     try:
         # Initiate the Phidgets code object
@@ -279,7 +309,7 @@ def main():
         doLight.setOnDetachHandler(onDetach)
         
         # Attach the light 
-        doLight.openWaitForAttachment(3000)
+        doLight.openWaitForAttachment(5000)
         # Flash light to let user know that the program has started
         onTimeSec = 0.05
         offTimeSec = 0.05
@@ -297,11 +327,38 @@ def main():
         viUpstream.setOnVoltageChangeHandler(onVoltageChange)
         viDownstream.setOnVoltageChangeHandler(onVoltageChange)
 
+        # Create the output voltages
+        if writeVoltageToOutputs:
+            # Create channels
+            outUpstream = DigitalOutput()
+            outDownstream = DigitalOutput()
+            outTank = DigitalOutput()
+            # Add them to the output list
+            digitalOutputs.append(outUpstream)
+            digitalOutputs.append(outDownstream)
+            digitalOutputs.append(outTank)
+            # Address
+            outUpstream.setHubPort(3)
+            outDownstream.setHubPort(4)
+            outTank.setHubPort(5)
+            outUpstream.setIsHubPortDevice(True)
+            outDownstream.setIsHubPortDevice(True)
+            outTank.setIsHubPortDevice(True)
+            # Open
+            outUpstream.openWaitForAttachment(5000)
+            outDownstream.openWaitForAttachment(5000)
+            outTank.openWaitForAttachment(5000)
+            outUpstream.setDutyCycle(0.0)
+            outDownstream.setDutyCycle(0.0)
+            outTank.setDutyCycle(0.0)
+
+
+
         # Open channels and wait for attachment
-        doDeflation.openWaitForAttachment(3000)
-        doInflation.openWaitForAttachment(3000)
-        viDownstream.openWaitForAttachment(3000)
-        viUpstream.openWaitForAttachment(3000)
+        doDeflation.openWaitForAttachment(5000)
+        doInflation.openWaitForAttachment(5000)
+        viDownstream.openWaitForAttachment(5000)
+        viUpstream.openWaitForAttachment(5000)
 
         # Set the data sampling interval
         viUpstream.setDataInterval(250)
@@ -334,39 +391,6 @@ def main():
     logging.info('Program ended at: ' + str(datetime.now()))
 # endregion Programing Routines ----------------------------------------------
 
-# region for testing ---------------------------------------------------------
-def bootTest():
-    try:
-        print("Boot test started!")
-        logging.info('Boot test started at: ' + str(datetime.now()))
-        light = DigitalOutput()
-
-        light.setHubPort(2)
-        light.setChannel(0)
-
-        light.openWaitForAttachment(3000)
-        
-        # Flash light to let user know that the program has started
-        light.openWaitForAttachment(3000)
-        onTimeSec = 0.05
-        offTimeSec = 0.05
-        blinkNumber = 10
-        for n in range(0,blinkNumber):
-            light.setState(True)  # Turn on
-            time.sleep(onTimeSec)  # Wait on
-            light.setState(False)  # Turn off
-            if n < blinkNumber:
-                time.sleep(offTimeSec)  # Wait off
-    except PhidgetException as ex:
-        traceback.print_exc()
-        message = "PhidgetException " + str(ex.code) + " (" + ex.description + "): " + ex.details
-        print(message)
-        logging.debug(message)
-
-    print("boot test compleat")
-    logging.debug("boot test compleat")
-
-# endregion for testing ------------------------------------------------------
 
 
 # Program Start Point
@@ -374,6 +398,11 @@ def bootTest():
     python /root/usr/ECB_road_test_program/ECB Road Test.py
 '''
 logging.basicConfig(filename='app.log', filemode='a', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+
+if len(sys.argv) > 1:
+    writeVoltageToOutputs = sys.argv[1]
+    print(writeVoltageToOutputs)
+
 # Call the main program
 main()
 # tm = datetime.now()
