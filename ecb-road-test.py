@@ -171,6 +171,9 @@ def getPhidgetName(phidget: Phidget) -> str:
 
 
 def solenoidToggle(do: DigitalOutput, state: bool = None):
+    global inflationStateTime
+    global deflationStateTime
+    global warningLightTime
     # If no value is given, then just switch the value
     name = getPhidgetName(do)
     if state == None:
