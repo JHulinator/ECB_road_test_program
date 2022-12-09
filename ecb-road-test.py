@@ -91,59 +91,35 @@ def onVoltageChange(self: VoltageInput, voltage):
             print(msg)
             logging.debug(msg)
         
+        # Check current stat of all solenoids
+        inflationState, deflationState, lightState = False, False, False
+        try:
+            inflationState = inflationSolenoid.getState()
+            deflationState = deflationSolenoid.getState()
+            lightState = warningLight.getState()
+        except PhidgetException as ex:
+            traceback.print_exc()
+            msg = "PhidgetException " + str(ex.code) + " (" + ex.description + "): " + ex.details
+            print(msg)
+            logging.debug(msg)
+
         # Determine if inflation solenoid should be opened
-        haveValidPressureValues = upstreamPressure != 0.0 and downstreamPressure != 0.0
-        isTankLow = tankPressure < SET_PRESSURE - 1
-        stateDuration = (datetime.now() - inflationStateTime)
-        isClosedThreeSeconds = (stateDuration.total_seconds() > 3) and not \
-            inflationSolenoid.getState()
-        isNotOpenedSixHundredSeconds = not ((stateDuration.total_seconds() > 600) \
-            and inflationSolenoid.getState())
-        isNotDeflating = not deflationSolenoid.getState()
-        isSupplyHigher = upstreamPressure > downstreamPressure + 5.0
-        # If all of the above conditions are true, then open inflation
-        shouldOpenInflation = haveValidPressureValues and isTankLow and \
-            isClosedThreeSeconds and isNotOpenedSixHundredSeconds and \
-            isNotDeflating and isSupplyHigher and not deflationSolenoid.getState()
+        inflateNeeded = shouldInflate(\
+                        inflationState=inflationState,\
+                        inflationChangeTime=inflationStateTime,\
+                        upstreamPressure=upstreamPressure,\
+                        downstreamPressure=downstreamPressure,\
+                        tankPressure=tankPressure
+                        )
+        solenoidToggle(inflationSolenoid, inflateNeeded)
         
-        # Determine if the deflation solenoid should be opened
-        shouldCloseDeflation = tankPressure < DEF_CLOSE_PRESSURE
-        isAboveDeflationOpen = tankPressure > DEF_OPEN_PRESSURE
-        deflationDuration = (datetime.now() - deflationStateTime)
-        isClosedSixtySecounds = (deflationDuration.total_seconds() > 60) and not \
-            deflationSolenoid.getState()
-        isInflationClosedSixtySecouds = (stateDuration.total_seconds() > 60) and \
-            not inflationSolenoid.getState()
-        shouldOpenDeflation = isAboveDeflationOpen and isClosedSixtySecounds and \
-            isInflationClosedSixtySecouds and not inflationSolenoid.getState()
+        # TODO: Determine if the deflation solenoid should be opened
 
-        # Determine if the warning light should be on
-        isPressureLow = tankPressure < SET_PRESSURE * 0.9
-        warningLightDuration = (datetime.now() - warningLightTime)
-        isOnForSixtySecounds = warningLightDuration.total_seconds() > 60 and \
-            warningLight.getState()
+        # TODO: Determine if the warning light should be on
+        warningLightNeeded = tankPressure < SET_PRESSURE*0.9
+        solenoidToggle(warningLight, warningLightNeeded)
+        
 
-        print(f'Inflation? -> {shouldOpenInflation}\n\t\
-            haveValidPressureValues={haveValidPressureValues} \n\t\
-            isTankLow={isTankLow}\n\t\
-            isClosedThreeSeconds={isClosedThreeSeconds}\n\t\
-            isNotOpenedSixHundredSeconds={isNotOpenedSixHundredSeconds}\n\t\
-            isNotDeflating={isNotDeflating}\n\t\
-            isSupplyHigher={isSupplyHigher}')
-        if shouldOpenInflation:
-            solenoidToggle(inflationSolenoid, True)
-        else:
-            solenoidToggle(inflationSolenoid, False)
-
-        if shouldCloseDeflation:
-            solenoidToggle(deflationSolenoid, False)
-        elif shouldOpenDeflation and not shouldOpenInflation:
-            solenoidToggle(deflationSolenoid, True)
-
-        if isPressureLow:
-            solenoidToggle(warningLight, True)
-        else:
-            solenoidToggle(warningLight, False)
 
 def onAttach(self):
     name = getPhidgetName(self)
@@ -211,6 +187,51 @@ def solenoidToggle(do: DigitalOutput, state: bool = None):
     else:
         pass
 
+
+def shouldInflate(inflationState:bool, inflationChangeTime, upstreamPressure:float, downstreamPressure:float, tankPressure:float) -> bool:
+    # This method determine if the inflation should be opened
+    '''
+    For inflation the 
+    If not inflating, following conditions must be met to start inflation:
+        1) tankPressure is less then SET_PRESSURE - 1psi
+        2) Inflation has been closed for more then three seconds
+        3) Deflation solenoid is not open --> This can be ignored for now
+        4) There is at least 5psi differential across the solenoid (upstreamPressure > downstreamPressure + 5psi)
+    Else stop inflating if any of the following:
+        1) Inflation has been opened for more than 600 seconds
+        2) tankPressure >= SET_PRESSURE
+    '''
+    if not inflationState:
+        condition1 = tankPressure < SET_PRESSURE - 1.0
+        condition2 = (datetime.now() - inflationChangeTime).total_seconds() > 3.0
+        condition4 = upstreamPressure > downstreamPressure + 5.0
+        message = f'Evaluation to start inflation made = condition1:{condition1} and condition2:{condition2} and condition4:{condition4} = {condition1 and condition2 and condition4}'
+        print(message)
+        return condition1 and condition2 and condition4
+    else:
+        condition1 = (datetime.now() - inflationChangeTime).total_seconds() > 600.0
+        condition2 = tankPressure >= SET_PRESSURE
+        message = f'Evaluation to stop inflation made = condition1:{condition1} and condition2:{condition2} = {condition1 and condition2}'
+        print(message)
+        return not (condition1 or condition2)
+
+def shouldDeflate() -> bool:
+    # This method determine if the inflation should be opened
+    '''
+    For deflation
+    If not deflating, the following conditions must be met to start deflation:
+        1) tankPressure is greater than DEF_OPEN_PRESSURE
+        2) Has been closed for more then 60 seconds
+        3) Inflation solenoid is not open  --> This can be ignored for now
+        4) Inflation has been closed for more then 60 seconds
+    Else stop deflating if:
+        1) tankPressure <= DEF_CLOSE_PRESSURE
+    '''
+    pass
+
+def shouldWarn():
+    # This method determine if the inflation should be opened
+    pass
 # endregion Helper Functions -------------------------------------------------
 
 # region Programing Routines -------------------------------------------------
@@ -355,5 +376,7 @@ def bootTest():
 logging.basicConfig(filename='app.log', filemode='a', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 # Call the main program
 main()
-# bootTest()
+# tm = datetime.now()
+# time.sleep(5.0)
+# print(shouldInflate(True, tm, 150.0, 100.0, 103.0))
 # Program End

@@ -7,3 +7,27 @@ root - DEBUG - The Upstream channel has successfully attached
 root - DEBUG - Set LED to True : [tankPressure = -18.0,             upstreamPressure = -18.4, downstreamPressure = -18.0]
 root - DEBUG - Set LED to True : [tankPressure = -18.0,             upstreamPressure = -18.4, downstreamPressure = -18.0]
 root - INFO - Program ended at: 2022-12-09 04:49:08.986705
+root - INFO - Program started at: 2022-12-09 06:31:16.789588
+root - DEBUG - The LED channel has successfully attached
+root - DEBUG - The Deflation channel has successfully attached
+root - DEBUG - The Inflation channel has successfully attached
+root - DEBUG - The Downstream channel has successfully attached
+root - DEBUG - The Upstream channel has successfully attached
+root - INFO - Program ended at: 2022-12-09 06:31:32.803804
+root - INFO - Program started at: 2022-12-09 06:35:50.570711
+root - DEBUG - The LED channel has successfully attached
+root - DEBUG - The Deflation channel has successfully attached
+root - DEBUG - The Inflation channel has successfully attached
+root - DEBUG - The Downstream channel has successfully attached
+root - DEBUG - The Upstream channel has successfully attached
+root - INFO - Program ended at: 2022-12-09 06:36:16.962541
+root - DEBUG - PhidgetException 52 (Device not Attached): This can happen for a number of common reasons. Be sure you are opening the channel before trying to use it. If you are opening the channel, the program may not be waiting for the channel to be attached. If possible use openWaitForAttachment. Otherwise, be sure to check the Attached property of the channel before trying to use it.
+root - INFO - Program started at: 2022-12-09 06:39:17.014681
+root - DEBUG - The LED channel has successfully attached
+root - DEBUG - The Deflation channel has successfully attached
+root - DEBUG - The Inflation channel has successfully attached
+root - DEBUG - The Downstream channel has successfully attached
+root - DEBUG - The Upstream channel has successfully attached
+root - DEBUG - Set LED to True : [tankPressure = -18.0,             upstreamPressure = -18.4, downstreamPressure = -18.0]
+root - DEBUG - Set LED to True : [tankPressure = -18.0,             upstreamPressure = -18.4, downstreamPressure = -18.0]
+root - INFO - Program ended at: 2022-12-09 06:39:24.404693
