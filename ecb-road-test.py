@@ -45,11 +45,12 @@ equation that work well of a verity of circumstances.
 CORRECTION_CONST1 = 1.43
 CORRECTION_CONST2 = -0.43
 CORRECTION_CONST3 = 0.2
+
+allChannelsAttached = False
 # endregion Global Variables -------------------------------------------------
 
 # region Event Handlers ------------------------------------------------------
 def onVoltageChange(self: VoltageInput, voltage):
-    # Only process events if both the upstream and downstream sensors are attached
     voltageInput = self
     global upstreamVoltage
     global upstreamPressure
@@ -59,84 +60,104 @@ def onVoltageChange(self: VoltageInput, voltage):
     global digitalOutputs
     global inflationStateTime
     global deflationStateTime
+    global allChannelsAttached
 
-    inflationSolenoid: DigitalOutput = digitalOutputs[0]
-    deflationSolenoid: DigitalOutput = digitalOutputs[1]
-    warningLight: DigitalOutput = digitalOutputs[2]
+    # Only process events if both the upstream and downstream sensors are attached
+    if allChannelsAttached:
+        inflationSolenoid: DigitalOutput = digitalOutputs[0]
+        deflationSolenoid: DigitalOutput = digitalOutputs[1]
+        warningLight: DigitalOutput = digitalOutputs[2]
 
-    if getPhidgetName(voltageInput) == 'Upstream':
-        # Update upstreamVoltage var
-        upstreamVoltage = voltage
-        # Update upstreamPressure var
-        upstreamPressure = voltageToPressure(voltageInput, voltage)
-    elif getPhidgetName(voltageInput) == 'Downstream':
-            # Update downstreamVoltage var
-        downstreamVoltage = voltage
-        # Update downstreamPressure var
-        downstreamPressure = voltageToPressure(voltageInput, voltage)
+        if getPhidgetName(voltageInput) == 'Upstream':
+            # Update upstreamVoltage var
+            upstreamVoltage = voltage
+            # Update upstreamPressure var
+            upstreamPressure = voltageToPressure(voltageInput, voltage)
+        elif getPhidgetName(voltageInput) == 'Downstream':
+                # Update downstreamVoltage var
+            downstreamVoltage = voltage
+            # Update downstreamPressure var
+            downstreamPressure = voltageToPressure(voltageInput, voltage)
+        # Update tank
+        try:
+            if inflationSolenoid.getState():
+                tankPressure = CORRECTION_CONST1 * downstreamPressure + \
+                    CORRECTION_CONST2 * upstreamPressure + CORRECTION_CONST3
+            else:
+                tankPressure = downstreamPressure
+        except PhidgetException as ex:
+            traceback.print_exc()
+            msg = "PhidgetException " + str(ex.code) + " (" + ex.description + "): " + ex.details
+            print(msg)
+            logging.debug(msg)
+        
+        # Determine if inflation solenoid should be opened
+        haveValidPressureValues = upstreamPressure != 0.0 and downstreamPressure != 0.0
+        isTankLow = tankPressure < SET_PRESSURE - 1
+        stateDuration = (datetime.now() - inflationStateTime)
+        isClosedThreeSeconds = (stateDuration.total_seconds() > 3) and not \
+            inflationSolenoid.getState()
+        isNotOpenedSixHundredSeconds = not ((stateDuration.total_seconds() > 600) \
+            and inflationSolenoid.getState())
+        isNotDeflating = not deflationSolenoid.getState()
+        isSupplyHigher = upstreamPressure > downstreamPressure + 5.0
+        # If all of the above conditions are true, then open inflation
+        shouldOpenInflation = haveValidPressureValues and isTankLow and \
+            isClosedThreeSeconds and isNotOpenedSixHundredSeconds and \
+            isNotDeflating and isSupplyHigher and not deflationSolenoid.getState()
+        
+        # Determine if the deflation solenoid should be opened
+        shouldCloseDeflation = tankPressure < DEF_CLOSE_PRESSURE
+        isAboveDeflationOpen = tankPressure > DEF_OPEN_PRESSURE
+        deflationDuration = (datetime.now() - deflationStateTime)
+        isClosedSixtySecounds = (deflationDuration.total_seconds() > 60) and not \
+            deflationSolenoid.getState()
+        isInflationClosedSixtySecouds = (stateDuration.total_seconds() > 60) and \
+            not inflationSolenoid.getState()
+        shouldOpenDeflation = isAboveDeflationOpen and isClosedSixtySecounds and \
+            isInflationClosedSixtySecouds and not inflationSolenoid.getState()
 
-    # Update tank
-    if inflationSolenoid.getState():
-        tankPressure = CORRECTION_CONST1 * downstreamPressure + \
-            CORRECTION_CONST2 * upstreamPressure + CORRECTION_CONST3
-    else:
-        tankPressure = downstreamPressure
+        # Determine if the warning light should be on
+        isPressureLow = tankPressure < SET_PRESSURE * 0.9
+        warningLightDuration = (datetime.now() - warningLightTime)
+        isOnForSixtySecounds = warningLightDuration.total_seconds() > 60 and \
+            warningLight.getState()
 
-    # print(f'[upstreamPressure = {upstreamPressure}, downstreamPressure = {downstreamPressure}, tankPressure = {tankPressure}]')
-    # Determine if inflation solenoid should be opened
-    haveValidPressureValues = upstreamPressure != 0.0 and downstreamPressure != 0.0
-    isTankLow = tankPressure < SET_PRESSURE - 1
-    stateDuration = (datetime.now() - inflationStateTime)
-    isClosedThreeSeconds = (stateDuration.total_seconds() > 3) and not \
-        inflationSolenoid.getState()
-    isNotOpenedSixHundredSeconds = not ((stateDuration.total_seconds() > 600) \
-        and inflationSolenoid.getState())
-    isNotDeflating = not deflationSolenoid.getState()
-    isSupplyHigher = upstreamPressure > downstreamPressure + 5.0
-    # If all of the above conditions are true, then open inflation
-    shouldOpenInflation = haveValidPressureValues and isTankLow and \
-        isClosedThreeSeconds and isNotOpenedSixHundredSeconds and \
-        isNotDeflating and isSupplyHigher and not deflationSolenoid.getState()
-    
-    # Determine if the deflation solenoid should be opened
-    shouldCloseDeflation = tankPressure < DEF_CLOSE_PRESSURE
-    isAboveDeflationOpen = tankPressure > DEF_OPEN_PRESSURE
-    deflationDuration = (datetime.now() - deflationStateTime)
-    isClosedSixtySecounds = (deflationDuration.total_seconds() > 60) and not \
-        deflationSolenoid.getState()
-    isInflationClosedSixtySecouds = (stateDuration.total_seconds() > 60) and \
-        not inflationSolenoid.getState()
-    shouldOpenDeflation = isAboveDeflationOpen and isClosedSixtySecounds and \
-        isInflationClosedSixtySecouds and not inflationSolenoid.getState()
+        print(f'Inflation? -> {shouldOpenInflation}\n\t\
+            haveValidPressureValues={haveValidPressureValues} \n\t\
+            isTankLow={isTankLow}\n\t\
+            isClosedThreeSeconds={isClosedThreeSeconds}\n\t\
+            isNotOpenedSixHundredSeconds={isNotOpenedSixHundredSeconds}\n\t\
+            isNotDeflating={isNotDeflating}\n\t\
+            isSupplyHigher={isSupplyHigher}')
+        if shouldOpenInflation:
+            solenoidToggle(inflationSolenoid, True)
+        else:
+            solenoidToggle(inflationSolenoid, False)
 
-    # Determine if the warning light should be on
-    isPressureLow = tankPressure < SET_PRESSURE * 0.9
-    warningLightDuration = (datetime.now() - warningLightTime)
-    isOnForSixtySecounds = warningLightDuration.total_seconds() > 60 and \
-        warningLight.getState()
+        if shouldCloseDeflation:
+            solenoidToggle(deflationSolenoid, False)
+        elif shouldOpenDeflation and not shouldOpenInflation:
+            solenoidToggle(deflationSolenoid, True)
 
-    print(f'Inflation? -> {shouldOpenInflation}\n\t\
-        haveValidPressureValues={haveValidPressureValues} \n\t\
-        isTankLow={isTankLow}\n\t\
-        isClosedThreeSeconds={isClosedThreeSeconds}\n\t\
-        isNotOpenedSixHundredSeconds={isNotOpenedSixHundredSeconds}\n\t\
-        isNotDeflating={isNotDeflating}\n\t\
-        isSupplyHigher={isSupplyHigher}')
-    if shouldOpenInflation:
-        solenoidToggle(inflationSolenoid, True)
-    else:
-        solenoidToggle(inflationSolenoid, False)
+        if isPressureLow:
+            solenoidToggle(warningLight, True)
+        else:
+            solenoidToggle(warningLight, False)
 
-    if shouldCloseDeflation:
-        solenoidToggle(deflationSolenoid, False)
-    elif shouldOpenDeflation and not shouldOpenInflation:
-        solenoidToggle(deflationSolenoid, True)
+def onAttach(self):
+    name = getPhidgetName(self)
+    message = f'The {name} channel has successfully attached'
+    print(message)
+    logging.debug(message)
 
-    if isPressureLow:
-        solenoidToggle(warningLight, True)
-    else:
-        solenoidToggle(warningLight, False)
-
+def onDetach(self):
+    global allChannelsAttached
+    allChannelsAttached = False
+    name = getPhidgetName(self)
+    message = f'The {name} channel has been detached'
+    print(message)
+    logging.debug(message)
 # endregion Event Handlers ---------------------------------------------------
 
 # region Helper Functions ----------------------------------------------------
@@ -198,76 +219,91 @@ def main():
     print('Main program has started')
     logging.info('Program started at: ' + str(datetime.now()))
     
-    # Initiate the Phidgets code object
-    viUpstream = VoltageInput()
-    viDownstream = VoltageInput()
-    doInflation = DigitalOutput()
-    doDeflation = DigitalOutput()
-    doLight = DigitalOutput()
-
-    # Add outputs to the list of outputs
-    digitalOutputs.append(doInflation)
-    digitalOutputs.append(doDeflation)
-    digitalOutputs.append(doLight)    
-
-    # Set Phidgets addressing parameters
-    viUpstream.setHubPort(0)  # Set to VINT port for upstream pressure transducer
-    viUpstream.setIsHubPortDevice(True)
-    viDownstream.setHubPort(1)  # Set to VINT port for downstream pressure transducer
-    viDownstream.setIsHubPortDevice(True)
-    doInflation.setHubPort(2)  # Set the VINT port that the relay is connected to
-    doInflation.setChannel(1)  # Set the channel on the relay module that the Inflation solenoid is connected to
-    doDeflation.setHubPort(2)  # Set the VINT port that the relay is connected to
-    doDeflation.setChannel(2)  # Set the channel on the relay module that the Deflation solenoid is connected to
-    doLight.setHubPort(2)  # Set the VINT port that the relay is connected to
-    doLight.setChannel(0)  # Set the channel on the relay module that the Warning Light is connected to
-    
-    print(f'Upstream = [{viUpstream.getHubPort()}, {viUpstream.getChannel()}]\n\
-            Downstream = [{viDownstream.getHubPort()}, {viDownstream.getChannel()}]\n\
-            Inflation [{doInflation.getHubPort()}, {doInflation.getChannel()}]\n\
-            Deflation = [{doDeflation.getHubPort()}, {doDeflation.getChannel()}]\n\
-            Light = [{doLight.getHubPort()}, {doLight.getChannel()}]')
-
-    # Flash light to let user know that the program has started
-    doLight.openWaitForAttachment(3000)
-    onTimeSec = 0.05
-    offTimeSec = 0.05
-    blinkNumber = 10
-    for n in range(0,blinkNumber):
-        doLight.setState(True)  # Turn on
-        time.sleep(onTimeSec)  # Wait on
-        doLight.setState(False)  # Turn off
-        if n < blinkNumber:
-            time.sleep(offTimeSec)  # Wait off
-
-
-    
-    # Assign the event handlers to react to input changes
-    viUpstream.setOnVoltageChangeHandler(onVoltageChange)
-
-    viDownstream.setOnVoltageChangeHandler(onVoltageChange)
-
-    # Open channels and wait for attachment
-    doDeflation.openWaitForAttachment(3000)
-    doInflation.openWaitForAttachment(3000)
-    viDownstream.openWaitForAttachment(3000)
-    viUpstream.openWaitForAttachment(3000)
-
-    # Set the data sampling interval
-    viUpstream.setDataInterval(250)
-    viDownstream.setDataInterval(250)
-
-    # Make sure program starts with all solenoids closed 
-    solenoidToggle(doDeflation, False)
-    solenoidToggle(doInflation, False)
-    solenoidToggle(doLight, False)
-
-    # Program will stall here until the Enter key is pressed to close
     try:
-        input('Press Enter to Stop\n')
-    except (Exception, KeyboardInterrupt):
-        pass
+        # Initiate the Phidgets code object
+        viUpstream = VoltageInput()
+        viDownstream = VoltageInput()
+        doInflation = DigitalOutput()
+        doDeflation = DigitalOutput()
+        doLight = DigitalOutput()
 
+        # Add outputs to the list of outputs
+        digitalOutputs.append(doInflation)
+        digitalOutputs.append(doDeflation)
+        digitalOutputs.append(doLight)    
+
+        # Set Phidgets addressing parameters
+        viUpstream.setHubPort(0)  # Set to VINT port for upstream pressure transducer
+        viUpstream.setIsHubPortDevice(True)
+        viDownstream.setHubPort(1)  # Set to VINT port for downstream pressure transducer
+        viDownstream.setIsHubPortDevice(True)
+        doInflation.setHubPort(2)  # Set the VINT port that the relay is connected to
+        doInflation.setChannel(1)  # Set the channel on the relay module that the Inflation solenoid is connected to
+        doDeflation.setHubPort(2)  # Set the VINT port that the relay is connected to
+        doDeflation.setChannel(2)  # Set the channel on the relay module that the Deflation solenoid is connected to
+        doLight.setHubPort(2)  # Set the VINT port that the relay is connected to
+        doLight.setChannel(0)  # Set the channel on the relay module that the Warning Light is connected to
+
+        # Assign attach/detach handlers
+        viDownstream.setOnAttachHandler(onAttach)
+        viUpstream.setOnAttachHandler(onAttach)
+        doInflation.setOnAttachHandler(onAttach)
+        doDeflation.setOnAttachHandler(onAttach)
+        doLight.setOnAttachHandler(onAttach)
+
+        viDownstream.setOnDetachHandler(onDetach)
+        viUpstream.setOnDetachHandler(onDetach)
+        doInflation.setOnDetachHandler(onDetach)
+        doDeflation.setOnDetachHandler(onDetach)
+        doLight.setOnDetachHandler(onDetach)
+        
+        # Attach the light 
+        doLight.openWaitForAttachment(3000)
+        # Flash light to let user know that the program has started
+        onTimeSec = 0.05
+        offTimeSec = 0.05
+        blinkNumber = 10
+        for n in range(0,blinkNumber):
+            doLight.setState(True)  # Turn on
+            time.sleep(onTimeSec)  # Wait on
+            doLight.setState(False)  # Turn off
+            if n < blinkNumber:
+                time.sleep(offTimeSec)  # Wait off
+
+
+        
+        # Assign the event handlers to react to input changes
+        viUpstream.setOnVoltageChangeHandler(onVoltageChange)
+        viDownstream.setOnVoltageChangeHandler(onVoltageChange)
+
+        # Open channels and wait for attachment
+        doDeflation.openWaitForAttachment(3000)
+        doInflation.openWaitForAttachment(3000)
+        viDownstream.openWaitForAttachment(3000)
+        viUpstream.openWaitForAttachment(3000)
+
+        # Set the data sampling interval
+        viUpstream.setDataInterval(250)
+        viDownstream.setDataInterval(250)
+        global allChannelsAttached 
+        allChannelsAttached = True
+
+        # Make sure program starts with all solenoids closed 
+        solenoidToggle(doDeflation, False)
+        solenoidToggle(doInflation, False)
+        solenoidToggle(doLight, False)
+
+        # Program will stall here until the Enter key is pressed to close
+        try:
+            input('Press Enter to Stop\n')
+        except (Exception, KeyboardInterrupt):
+            pass
+    except PhidgetException as ex:
+        traceback.print_exc()
+        message = "PhidgetException " + str(ex.code) + " (" + ex.description + "): " + ex.details
+        print(message)
+        logging.debug(message)
+    
     doLight.close()
     doDeflation.close()
     doInflation.close()
