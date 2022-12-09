@@ -1,4 +1,5 @@
 #!usr/bin/python3
+
 # region Imports -------------------------------------------------------------
 from Phidget22.Phidget import *
 from Phidget22.Devices.VoltageInput import *
@@ -11,7 +12,6 @@ import sys
 # endregion End Imports ------------------------------------------------------
 
 # region Global Variables ----------------------------------------------------
-# TODO: Evaluate weather variables should be moved to event routine where used. 
 # Input variables
 upstreamVoltage = 0.0  # V_u This will be current voltage of upstream pressure transducer
 downstreamVoltage = 0.0  # V_d This will be current voltage of downstream pressure transducer
@@ -32,7 +32,7 @@ SET_PRESSURE = 103.0  # C_1 This is the desired tire pressure
 SLOPE_UPSTREAM = 36.674  # C_2 This is the calibration slope for the upstream pressure transducer 
 OFFSET_UPSTREAM = -18.4  # C_3 This is the calibration offset for the upstream pressure transducer
 SLOPE_DOWNSTREAM = 36.778  # C_4 This is the calibration slope for the downstream pressure transducer
-OFFSET_DOWNSTREAM = -18.0  # C_5 This is the calibration offset for the downstream pressure transducer
+OFFSET_DOWNSTREAM = -18.4  # C_5 This is the calibration offset for the downstream pressure transducer
 DEF_OPEN_PRESSURE = SET_PRESSURE + 8  # C_6 This should be a min of C_1+4 and a max of 125 PSI
 DEF_CLOSE_PRESSURE = SET_PRESSURE + 5  # C_7 This should be a min of C_1+1 and a max of C_6-1
 
@@ -113,16 +113,30 @@ def onVoltageChange(self: VoltageInput, voltage):
                             inflationChangeTime=inflationStateTime,\
                             upstreamPressure=upstreamPressure,\
                             downstreamPressure=downstreamPressure,\
-                            tankPressure=tankPressure
+                            tankPressure=tankPressure,\
+                            deflation=deflationState
                             )
+            # Set solenoid per result
             solenoidToggle(inflationSolenoid, inflateNeeded)
             
-            # TODO: Determine if the deflation solenoid should be opened
-
+            # Determine if the deflation solenoid should be opened
+            deflateNeeded = shouldDeflate(\
+                                deflationState=deflationState,\
+                                deflationChangeTime=deflationStateTime,\
+                                inflationState=inflationState,\
+                                inflationChangeTime=inflationStateTime,\
+                                tankPressure=tankPressure
+                                )
+            # Set solenoid per result
+            if not inflateNeeded:  # Note this is probable not needed but is here just to make sure we never try to open them both
+                solenoidToggle(deflationSolenoid, deflateNeeded)
+            
+            
             # TODO: Determine if the warning light should be on
             warningLightNeeded = tankPressure < SET_PRESSURE*0.9
             solenoidToggle(warningLight, warningLightNeeded)
 
+            # Output pressure values to match the read to the extra VINT ports
             if writeVoltageToOutputs:
                 writeOutputs(upstreamPressure, downstreamPressure, tankPressure)
         
@@ -198,14 +212,14 @@ def solenoidToggle(do: DigitalOutput, state: bool = None):
         pass
 
 
-def shouldInflate(inflationState:bool, inflationChangeTime, upstreamPressure:float, downstreamPressure:float, tankPressure:float) -> bool:
+def shouldInflate(inflationState:bool, inflationChangeTime:datetime, upstreamPressure:float, downstreamPressure:float, tankPressure:float, deflation:bool) -> bool:
     # This method determine if the inflation should be opened
     '''
     For inflation the 
     If not inflating, following conditions must be met to start inflation:
         1) tankPressure is less then SET_PRESSURE - 1psi
         2) Inflation has been closed for more then three seconds
-        3) Deflation solenoid is not open --> This can be ignored for now
+        3) Deflation solenoid is not open
         4) There is at least 5psi differential across the solenoid (upstreamPressure > downstreamPressure + 5psi)
     Else stop inflating if any of the following:
         1) Inflation has been opened for more than 600 seconds
@@ -214,31 +228,39 @@ def shouldInflate(inflationState:bool, inflationChangeTime, upstreamPressure:flo
     if not inflationState:
         condition1 = tankPressure < SET_PRESSURE - 1.0
         condition2 = (datetime.now() - inflationChangeTime).total_seconds() > 3.0
+        condition3 = not deflation
         condition4 = upstreamPressure > downstreamPressure + 5.0
-        message = f'Evaluation to start inflation made = condition1:{condition1} and condition2:{condition2} and condition4:{condition4} = {condition1 and condition2 and condition4}'
+        message = f'Evaluation to start inflation made = condition1:{condition1} and condition2:{condition2} and condition3:{condition3} and condition4:{condition4} = {condition1 and condition2 and condition4}'
         print(message)
-        return condition1 and condition2 and condition4
+        return condition1 and condition2 and condition3 and condition4
     else:
         condition1 = (datetime.now() - inflationChangeTime).total_seconds() > 600.0
         condition2 = tankPressure >= SET_PRESSURE
-        message = f'Evaluation to stop inflation made = condition1:{condition1} and condition2:{condition2} = {condition1 and condition2}'
+        message = f'Evaluation to stop inflation made = condition1:{condition1} or condition2:{condition2} = {condition1 and condition2}'
         print(message)
         return not (condition1 or condition2)
 
 
-def shouldDeflate() -> bool:
+def shouldDeflate(deflationState:bool, inflationState:bool, deflationChangeTime:datetime, inflationChangeTime:datetime, tankPressure:float) -> bool:
     # This method determine if the inflation should be opened
     '''
     For deflation
     If not deflating, the following conditions must be met to start deflation:
         1) tankPressure is greater than DEF_OPEN_PRESSURE
         2) Has been closed for more then 60 seconds
-        3) Inflation solenoid is not open  --> This can be ignored for now
+        3) Inflation solenoid is not open
         4) Inflation has been closed for more then 60 seconds
     Else stop deflating if:
         1) tankPressure <= DEF_CLOSE_PRESSURE
     '''
-    pass
+    if not deflationState:
+        condition1 = tankPressure > DEF_OPEN_PRESSURE
+        condition2 = (datetime.now() - deflationChangeTime).total_seconds() > 60 
+        condition3 = not inflationState
+        condition4 = (datetime.now() - inflationChangeTime).total_seconds() > 60
+        return condition1 and condition2 and condition3 and condition4
+    else:
+        return tankPressure <= DEF_CLOSE_PRESSURE
 
 
 def shouldWarn():
@@ -397,9 +419,6 @@ def main():
 
 
 # Program Start Point
-'''TODO: add the following line below the to the file /etc/rc.local
-    python /root/usr/ECB_road_test_program/ECB Road Test.py
-'''
 logging.basicConfig(filename='app.log', filemode='a', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
 if len(sys.argv) > 1:
@@ -408,7 +427,4 @@ if len(sys.argv) > 1:
 
 # Call the main program
 main()
-# tm = datetime.now()
-# time.sleep(5.0)
-# print(shouldInflate(True, tm, 150.0, 100.0, 103.0))
 # Program End
