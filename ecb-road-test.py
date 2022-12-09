@@ -9,7 +9,7 @@ import traceback
 # endregion End Imports ------------------------------------------------------
 
 # region Global Variables ----------------------------------------------------
-# TODO: Evaluate weather variables should be moved to event rutene where used. 
+# TODO: Evaluate weather variables should be moved to event routine where used. 
 # Input variables
 upstreamVoltage = 0.0  # V_u This will be current voltage of upstream pressure transducer
 downstreamVoltage = 0.0  # V_d This will be current voltage of downstream pressure transducer
@@ -48,7 +48,7 @@ CORRECTION_CONST3 = 0.2
 
 # region Event Handlers ------------------------------------------------------
 def onVoltageChange(self: VoltageInput, voltage):
-    # Only prosess events if both the upstream and downstream sensors are attached
+    # Only process events if both the upstream and downstream sensors are attached
     voltageInput = self
     global upstreamVoltage
     global upstreamPressure
@@ -86,15 +86,15 @@ def onVoltageChange(self: VoltageInput, voltage):
     haveValidPressureValues = upstreamPressure != 0.0 and downstreamPressure != 0.0
     isTankLow = tankPressure < SET_PRESSURE - 1
     stateDuration = (datetime.now() - inflationStateTime)
-    isClosedTreeSecounds = (stateDuration.total_seconds() > 3) and not \
+    isClosedThreeSeconds = (stateDuration.total_seconds() > 3) and not \
         inflationSolenoid.getState()
-    isNotOpenedSixHundredSecounds = not ((stateDuration.total_seconds() > 600) \
+    isNotOpenedSixHundredSeconds = not ((stateDuration.total_seconds() > 600) \
         and inflationSolenoid.getState())
     isNotDeflating = not deflationSolenoid.getState()
     isSupplyHigher = upstreamPressure > downstreamPressure + 5.0
     # If all of the above conditions are true, then open inflation
     shouldOpenInflation = haveValidPressureValues and isTankLow and \
-        isClosedTreeSecounds and isNotOpenedSixHundredSecounds and \
+        isClosedThreeSeconds and isNotOpenedSixHundredSeconds and \
         isNotDeflating and isSupplyHigher and not deflationSolenoid.getState()
     
     # Determine if the deflation solenoid should be opened
@@ -114,27 +114,27 @@ def onVoltageChange(self: VoltageInput, voltage):
     isOnForSixtySecounds = warningLightDuration.total_seconds() > 60 and \
         warningLight.getState()
 
-    print(f'Invlation? -> {shouldOpenInflation}\n\t\
-        hasValidPresure={haveValidPressureValues} \n\t\
+    print(f'Inflation? -> {shouldOpenInflation}\n\t\
+        haveValidPressureValues={haveValidPressureValues} \n\t\
         isTankLow={isTankLow}\n\t\
-        isClosedTreeSecounds={isClosedTreeSecounds}\n\t\
-        isNotOpenedSixHundredSecounds={isNotOpenedSixHundredSecounds}\n\t\
+        isClosedThreeSeconds={isClosedThreeSeconds}\n\t\
+        isNotOpenedSixHundredSeconds={isNotOpenedSixHundredSeconds}\n\t\
         isNotDeflating={isNotDeflating}\n\t\
         isSupplyHigher={isSupplyHigher}')
     if shouldOpenInflation:
-        solinoidToggle(inflationSolenoid, True)
+        solenoidToggle(inflationSolenoid, True)
     else:
-        solinoidToggle(inflationSolenoid, False)
+        solenoidToggle(inflationSolenoid, False)
 
     if shouldCloseDeflation:
-        solinoidToggle(deflationSolenoid, False)
+        solenoidToggle(deflationSolenoid, False)
     elif shouldOpenDeflation and not shouldOpenInflation:
-        solinoidToggle(deflationSolenoid, True)
+        solenoidToggle(deflationSolenoid, True)
 
     if isPressureLow:
-        solinoidToggle(warningLight, True)
+        solenoidToggle(warningLight, True)
     else:
-        solinoidToggle(warningLight, False)
+        solenoidToggle(warningLight, False)
 
 # endregion Event Handlers ---------------------------------------------------
 
@@ -150,7 +150,7 @@ def voltageToPressure(self: VoltageInput, voltage) -> float:
 
 def getPhidgetName(phidget: Phidget) -> str:
     id =  phidget.getChannel()
-    # This method identifies the phiget and returns its name
+    # This method identifies the phidget and returns its name
     if phidget.getHubPort() != 2:
         if phidget.getHubPort() == 0:
             return 'Upstream'
@@ -165,7 +165,7 @@ def getPhidgetName(phidget: Phidget) -> str:
             return 'LED'
 
 
-def solinoidToggle(do: DigitalOutput, state: bool = None):
+def solenoidToggle(do: DigitalOutput, state: bool = None):
     # If no value is given, then just switch the value
     name = getPhidgetName(do)
     if state == None:
@@ -252,14 +252,14 @@ def main():
     viDownstream.openWaitForAttachment(3000)
     viUpstream.openWaitForAttachment(3000)
 
-    # Set the data sampeling interval
+    # Set the data sampling interval
     viUpstream.setDataInterval(250)
     viDownstream.setDataInterval(250)
 
-    # Make sure program starts with all solinoids closed 
-    solinoidToggle(doDeflation, False)
-    solinoidToggle(doInflation, False)
-    solinoidToggle(doLight, False)
+    # Make sure program starts with all solenoids closed 
+    solenoidToggle(doDeflation, False)
+    solenoidToggle(doInflation, False)
+    solenoidToggle(doLight, False)
 
     # Program will stall here until the Enter key is pressed to close
     try:
@@ -273,7 +273,7 @@ def main():
     viDownstream.close()
     viUpstream.close()
     print('The main program has been exited')
-    logging.info('Program endded at: ' + str(datetime.now()))
+    logging.info('Program ended at: ' + str(datetime.now()))
 # endregion Programing Routines ----------------------------------------------
 
 # region for testing ---------------------------------------------------------
@@ -305,8 +305,8 @@ def bootTest():
         print(message)
         logging.debug(message)
 
-    print("boot test compleate")
-    logging.debug("boot test compleate")
+    print("boot test compleat")
+    logging.debug("boot test compleat")
 
 # endregion for testing ------------------------------------------------------
 
