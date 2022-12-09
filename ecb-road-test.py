@@ -1,3 +1,4 @@
+#!usr/bin/python3
 # region Imports -------------------------------------------------------------
 from Phidget22.Phidget import *
 from Phidget22.Devices.VoltageInput import *
@@ -26,10 +27,10 @@ tankPressure = 0.0  # P_t This will be the calculated tank pressure in [PSI]
 digitalOutputs = list()
 
 # Constants
-SET_PRESSURE = 110.0  # C_1 This is the desired tire pressure
-SLOPE_UPSTREAM = 56.694  # C_2 This is the calibration slope for the upstream pressure transducer 
-OFFSET_UPSTREAM = -18.0  # C_3 This is the calibration offset for the upstream pressure transducer
-SLOPE_DOWNSTREAM = 56.605  # C_4 This is the calibration slope for the downstream pressure transducer
+SET_PRESSURE = 103.0  # C_1 This is the desired tire pressure
+SLOPE_UPSTREAM = 36.674  # C_2 This is the calibration slope for the upstream pressure transducer 
+OFFSET_UPSTREAM = -18.4  # C_3 This is the calibration offset for the upstream pressure transducer
+SLOPE_DOWNSTREAM = 36.778  # C_4 This is the calibration slope for the downstream pressure transducer
 OFFSET_DOWNSTREAM = -18.0  # C_5 This is the calibration offset for the downstream pressure transducer
 DEF_OPEN_PRESSURE = SET_PRESSURE + 8  # C_6 This should be a min of C_1+4 and a max of 125 PSI
 DEF_CLOSE_PRESSURE = SET_PRESSURE + 5  # C_7 This should be a min of C_1+1 and a max of C_6-1
