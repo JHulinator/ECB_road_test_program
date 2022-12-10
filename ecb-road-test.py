@@ -48,7 +48,8 @@ CORRECTION_CONST2 = -0.43
 CORRECTION_CONST3 = 0.2
 
 allChannelsAttached = False  # This is set to true when all channels have been attached
-writeVoltageToOutputs = True  # If true voltages will be output on the extra channels, defaults to true but can be overwrten by passing False as the first arg when this script is called
+writeVoltageToOutputs = False  # If true voltages will be output on the extra channels, defaults to true but can be overwrten by passing False as the first arg when this script is called
+viTank = VoltageInput()  # This will monitor the actual tank pressure for debugging, it will only attach if the above var is Trues
 # endregion Global Variables -------------------------------------------------
 
 # region Event Handlers ------------------------------------------------------
@@ -164,7 +165,9 @@ def voltageToPressure(self: VoltageInput, voltage) -> float:
     elif getPhidgetName(self) == 'Downstream':
         return SLOPE_DOWNSTREAM * voltage + OFFSET_DOWNSTREAM
     else:
-        return 0.00
+        slop_ave = (SLOPE_UPSTREAM + SLOPE_DOWNSTREAM) / 2.0
+        offset_ave = (OFFSET_UPSTREAM + OFFSET_DOWNSTREAM) / 2.0
+        return slop_ave * voltage + offset_ave
 
 
 def getPhidgetName(phidget: Phidget) -> str:
@@ -175,6 +178,12 @@ def getPhidgetName(phidget: Phidget) -> str:
             return 'Upstream'
         elif phidget.getHubPort() == 1:
             return 'Downstream'
+        elif phidget.getHubPort == 3:
+            return 'Upstream Output'
+        elif phidget.getHubPort == 4:
+            return 'Downstream Output'
+        elif phidget.getHubPort == 5:
+            return 'Actual Tank'
     else:
         if id == 1:
             return 'Inflation'
@@ -233,6 +242,8 @@ def shouldInflate(inflationState:bool, inflationChangeTime:datetime, upstreamPre
         # message = f'Evaluation to start inflation made = condition1:{condition1} and condition2:{condition2} and condition3:{condition3} and condition4:{condition4} = {condition1 and condition2 and condition4}'
         message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = {tankPressure}'
         print(message)
+        logMessage = f',{upstreamPressure}, {downstreamPressure}, {tankPressure}, {voltageToPressure(viTank, viTank.getVoltage())}'
+        logging.debug(logMessage)
         return condition1 and condition2 and condition3 and condition4
     else:
         condition1 = (datetime.now() - inflationChangeTime).total_seconds() > 600.0
@@ -240,6 +251,8 @@ def shouldInflate(inflationState:bool, inflationChangeTime:datetime, upstreamPre
         # message = f'Evaluation to stop inflation made = condition1:{condition1} or condition2:{condition2} = {condition1 and condition2}'
         message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = {tankPressure}'
         print(message)
+        logMessage = f',{upstreamPressure}, {downstreamPressure}, {tankPressure}, {voltageToPressure(viTank, viTank.getVoltage())}'
+        logging.debug(logMessage)
         return not (condition1 or condition2)
 
 
@@ -266,7 +279,7 @@ def shouldDeflate(deflationState:bool, inflationState:bool, deflationChangeTime:
 
 
 def shouldWarn():
-    # This method determine if the inflation should be opened
+    # TODO: This method determine if the inflation should be opened
     pass
 
 
@@ -354,32 +367,31 @@ def main():
         viUpstream.setOnVoltageChangeHandler(onVoltageChange)
         viDownstream.setOnVoltageChangeHandler(onVoltageChange)
 
-        # Create the output voltages
+        # Create the output voltages. These are for debuging
         if writeVoltageToOutputs:
             # Create channels
             outUpstream = DigitalOutput()
             outDownstream = DigitalOutput()
-            outTank = DigitalOutput()
             # Add them to the output list
             digitalOutputs.append(outUpstream)
             digitalOutputs.append(outDownstream)
-            digitalOutputs.append(outTank)
             # Address
             outUpstream.setHubPort(3)
             outDownstream.setHubPort(4)
-            outTank.setHubPort(5)
             outUpstream.setIsHubPortDevice(True)
             outDownstream.setIsHubPortDevice(True)
-            outTank.setIsHubPortDevice(True)
             # Open
             outUpstream.openWaitForAttachment(5000)
             outDownstream.openWaitForAttachment(5000)
-            outTank.openWaitForAttachment(5000)
+
             outUpstream.setDutyCycle(0.0)
             outDownstream.setDutyCycle(0.0)
-            outTank.setDutyCycle(0.0)
 
-
+        # Set up port five for the actual tank pressure
+        viTank.setHubPort(5)
+        viTank.setIsHubPortDevice(True)
+        viTank.openWaitForAttachment(5000)
+        viTank.setDataInterval(250)
 
         # Open channels and wait for attachment
         doDeflation.openWaitForAttachment(5000)
@@ -390,6 +402,8 @@ def main():
         # Set the data sampling interval
         viUpstream.setDataInterval(250)
         viDownstream.setDataInterval(250)
+
+        # If we make it to this point in the code, then all channels will have been attached
         global allChannelsAttached 
         allChannelsAttached = True
 
