@@ -35,6 +35,8 @@ SLOPE_DOWNSTREAM = 36.778  # C_4 This is the calibration slope for the downstrea
 OFFSET_DOWNSTREAM = -18.4  # C_5 This is the calibration offset for the downstream pressure transducer
 DEF_OPEN_PRESSURE = SET_PRESSURE + 8  # C_6 This should be a min of C_1+4 and a max of 125 PSI
 DEF_CLOSE_PRESSURE = SET_PRESSURE + 5  # C_7 This should be a min of C_1+1 and a max of C_6-1
+SLOPE_TANK = 36.5
+OFFSET_TANK = -18.4
 
 '''
 Since tire pressure is not measured directly, it must be estimated. The tire
@@ -164,6 +166,8 @@ def voltageToPressure(self: VoltageInput, voltage) -> float:
         return SLOPE_UPSTREAM * voltage + OFFSET_UPSTREAM
     elif getPhidgetName(self) == 'Downstream':
         return SLOPE_DOWNSTREAM * voltage + OFFSET_DOWNSTREAM
+    elif getPhidgetName(self) == 'Actual Tank':
+        return SLOPE_TANK * voltage + OFFSET_TANK
     else:
         slop_ave = (SLOPE_UPSTREAM + SLOPE_DOWNSTREAM) / 2.0
         offset_ave = (OFFSET_UPSTREAM + OFFSET_DOWNSTREAM) / 2.0
@@ -239,19 +243,26 @@ def shouldInflate(inflationState:bool, inflationChangeTime:datetime, upstreamPre
         condition2 = (datetime.now() - inflationChangeTime).total_seconds() > 3.0
         condition3 = not deflation
         condition4 = upstreamPressure > downstreamPressure + 5.0
+        
+        # Print and Log Data
         # message = f'Evaluation to start inflation made = condition1:{condition1} and condition2:{condition2} and condition3:{condition3} and condition4:{condition4} = {condition1 and condition2 and condition4}'
-        message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = {tankPressure}'
+        vTank = viTank.getVoltage()
+        psiTank = voltageToPressure(viTank, vTank) 
+        message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = [{vTank}Volts, {psiTank}PSI], Calculatede Tank = {tankPressure}'
         print(message)
-        logMessage = f',{upstreamPressure}, {downstreamPressure}, {tankPressure}, {voltageToPressure(viTank, viTank.getVoltage())}'
+        logMessage = f',{upstreamPressure}, {downstreamPressure}, {tankPressure}, {psiTank}'
         logging.debug(logMessage)
+        
         return condition1 and condition2 and condition3 and condition4
     else:
         condition1 = (datetime.now() - inflationChangeTime).total_seconds() > 600.0
         condition2 = tankPressure >= SET_PRESSURE
         # message = f'Evaluation to stop inflation made = condition1:{condition1} or condition2:{condition2} = {condition1 and condition2}'
-        message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = {tankPressure}'
+        vTank = viTank.getVoltage()
+        psiTank = voltageToPressure(viTank, vTank) 
+        message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = [{vTank}Volts, {psiTank}PSI], Calculatede Tank = {tankPressure}'
         print(message)
-        logMessage = f',{upstreamPressure}, {downstreamPressure}, {tankPressure}, {voltageToPressure(viTank, viTank.getVoltage())}'
+        logMessage = f',{upstreamPressure}, {downstreamPressure}, {tankPressure}, {psiTank}'
         logging.debug(logMessage)
         return not (condition1 or condition2)
 
