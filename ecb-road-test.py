@@ -29,14 +29,14 @@ digitalOutputs = list()
 
 # Constants
 SET_PRESSURE = 103.0  # C_1 This is the desired tire pressure
-SLOPE_UPSTREAM = 36.674  # C_2 This is the calibration slope for the upstream pressure transducer 
-OFFSET_UPSTREAM = -18.4  # C_3 This is the calibration offset for the upstream pressure transducer
-SLOPE_DOWNSTREAM = 36.778  # C_4 This is the calibration slope for the downstream pressure transducer
-OFFSET_DOWNSTREAM = -18.4  # C_5 This is the calibration offset for the downstream pressure transducer
+SLOPE_UPSTREAM = 37.818  # C_2 This is the calibration slope for the upstream pressure transducer 
+OFFSET_UPSTREAM = -17.695  # C_3 This is the calibration offset for the upstream pressure transducer
+SLOPE_DOWNSTREAM = 37.794  # C_4 This is the calibration slope for the downstream pressure transducer
+OFFSET_DOWNSTREAM = -17.684  # C_5 This is the calibration offset for the downstream pressure transducer
 DEF_OPEN_PRESSURE = SET_PRESSURE + 8  # C_6 This should be a min of C_1+4 and a max of 125 PSI
 DEF_CLOSE_PRESSURE = SET_PRESSURE + 5  # C_7 This should be a min of C_1+1 and a max of C_6-1
-SLOPE_TANK = 36.5
-OFFSET_TANK = -18.4
+SLOPE_TANK = 37.8
+OFFSET_TANK = -17.69
 
 '''
 Since tire pressure is not measured directly, it must be estimated. The tire
