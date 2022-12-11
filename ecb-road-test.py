@@ -436,7 +436,8 @@ def main():
         try:
             input('Press Enter to Stop\n')
         except (Exception, KeyboardInterrupt):
-            pass
+            while True:
+                pass
     except PhidgetException as ex:
         traceback.print_exc()
         message = "PhidgetException " + str(ex.code) + " (" + ex.description + "): " + ex.details
