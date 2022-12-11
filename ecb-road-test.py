@@ -45,9 +45,9 @@ P_t = CORRECTION_CONST1*P_d + CORRECTION_CONST2*P_u + CORRECTION_CONST3
 Preliminary testing was done to determine constants for this correction
 equation that work well of a verity of circumstances. 
 '''
-CORRECTION_CONST1 = 1.43
-CORRECTION_CONST2 = -0.43
-CORRECTION_CONST3 = 0.2
+CORRECTION_CONST1 = 1
+CORRECTION_CONST2 = 0.0
+CORRECTION_CONST3 = 0.0
 
 allChannelsAttached = False  # This is set to true when all channels have been attached
 writeVoltageToOutputs = False  # If true voltages will be output on the extra channels, defaults to true but can be overwrten by passing False as the first arg when this script is called
@@ -157,7 +157,7 @@ def onDetach(self):
     name = getPhidgetName(self)
     message = f'The {name} channel has been detached'
     print(message)
-    logging.debug(message)
+    logging.critical(message)
 # endregion Event Handlers ---------------------------------------------------
 
 # region Helper Functions ----------------------------------------------------
@@ -205,14 +205,12 @@ def solenoidToggle(do: DigitalOutput, state: bool = None):
     name = getPhidgetName(do)
     if state == None:
         do.setState(not do.getState())
-        message = f'Set {name} to {not do.getState()} : [tankPressure = {tankPressure}, \
-            upstreamPressure = {upstreamPressure}, downstreamPressure = {downstreamPressure}]'
+        message = f'Set {name} to {not do.getState()} : [tankPressure = {tankPressure:.2f}, upstreamPressure = {upstreamPressure:.2f}, downstreamPressure = {downstreamPressure:.2f}]'
         print(message)
         logging.debug(message)
     elif do.getState() != state:
         do.setState(state)
-        message = f'Set {name} to {state} : [tankPressure = {tankPressure}, \
-            upstreamPressure = {upstreamPressure}, downstreamPressure = {downstreamPressure}]'
+        message = f'Set {name} to {state} : [tankPressure = {tankPressure:.2f}, upstreamPressure = {upstreamPressure:.2f}, downstreamPressure = {downstreamPressure:.2f}]'
         print(message)
         logging.debug(message)
         if name == 'Inflation':
@@ -237,6 +235,7 @@ def shouldInflate(inflationState:bool, inflationChangeTime:datetime, upstreamPre
     Else stop inflating if any of the following:
         1) Inflation has been opened for more than 600 seconds
         2) tankPressure >= SET_PRESSURE
+        3) upstreamPressure < downstreamPressure + 1
     '''
     if not inflationState:
         condition1 = tankPressure < SET_PRESSURE - 1.0
@@ -245,26 +244,36 @@ def shouldInflate(inflationState:bool, inflationChangeTime:datetime, upstreamPre
         condition4 = upstreamPressure > downstreamPressure + 5.0
         
         # Print and Log Data
-        # message = f'Evaluation to start inflation made = condition1:{condition1} and condition2:{condition2} and condition3:{condition3} and condition4:{condition4} = {condition1 and condition2 and condition4}'
-        vTank = viTank.getVoltage()
-        psiTank = voltageToPressure(viTank, vTank) 
-        message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = [{vTank}Volts, {psiTank}PSI], Calculatede Tank = {tankPressure}'
-        print(message)
-        logMessage = f',{upstreamPressure}, {downstreamPressure}, {tankPressure}, {psiTank}'
-        logging.debug(logMessage)
-        
+        if writeVoltageToOutputs:
+            vTank = viTank.getVoltage()
+            psiTank = voltageToPressure(viTank, vTank) 
+            message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = [{vTank}Volts, {psiTank}PSI], Calculatede Tank = {tankPressure}'
+            print(message)
+            logMessage = f',{upstreamPressure}, {downstreamPressure}, {tankPressure}, {psiTank}'
+            logging.debug(logMessage)
+        else:
+            message = f'Upstream {upstreamPressure:.2f}, Downstream = {downstreamPressure:.2f}'
+            print(message)
+
         return condition1 and condition2 and condition3 and condition4
     else:
         condition1 = (datetime.now() - inflationChangeTime).total_seconds() > 600.0
         condition2 = tankPressure >= SET_PRESSURE
-        # message = f'Evaluation to stop inflation made = condition1:{condition1} or condition2:{condition2} = {condition1 and condition2}'
-        vTank = viTank.getVoltage()
-        psiTank = voltageToPressure(viTank, vTank) 
-        message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = [{vTank}Volts, {psiTank}PSI], Calculatede Tank = {tankPressure}'
-        print(message)
-        logMessage = f',{upstreamPressure}, {downstreamPressure}, {tankPressure}, {psiTank}'
-        logging.debug(logMessage)
-        return not (condition1 or condition2)
+        condition3 = upstreamPressure < downstreamPressure + 1.0
+        
+        # Print and Log Data
+        if writeVoltageToOutputs:
+            vTank = viTank.getVoltage()
+            psiTank = voltageToPressure(viTank, vTank) 
+            message = f'Upstream = [{upstreamVoltage}Volt, {upstreamPressure}PSI], Downstream = [{downstreamVoltage}Volt, {downstreamPressure}PSI], Tank = [{vTank}Volts, {psiTank}PSI], Calculatede Tank = {tankPressure}'
+            print(message)
+            logMessage = f',{upstreamPressure}, {downstreamPressure}, {tankPressure}, {psiTank}'
+            logging.debug(logMessage)
+        else:
+            message = f'Upstream {upstreamPressure:.2f}, Downstream = {downstreamPressure:.2f}'
+            print(message)
+
+        return not (condition1 or condition2 or condition3)
 
 
 def shouldDeflate(deflationState:bool, inflationState:bool, deflationChangeTime:datetime, inflationChangeTime:datetime, tankPressure:float) -> bool:
@@ -398,11 +407,11 @@ def main():
             outUpstream.setDutyCycle(0.0)
             outDownstream.setDutyCycle(0.0)
 
-        # Set up port five for the actual tank pressure
-        viTank.setHubPort(5)
-        viTank.setIsHubPortDevice(True)
-        viTank.openWaitForAttachment(5000)
-        viTank.setDataInterval(250)
+            # Set up port five for the actual tank pressure
+            viTank.setHubPort(5)
+            viTank.setIsHubPortDevice(True)
+            viTank.openWaitForAttachment(5000)
+            viTank.setDataInterval(250)
 
         # Open channels and wait for attachment
         doDeflation.openWaitForAttachment(5000)
@@ -432,7 +441,7 @@ def main():
         traceback.print_exc()
         message = "PhidgetException " + str(ex.code) + " (" + ex.description + "): " + ex.details
         print(message)
-        logging.debug(message)
+        logging.critical(message)
     
     doLight.close()
     doDeflation.close()
