@@ -126,7 +126,7 @@ def onVoltageChange(self: VoltageInput, voltage):
             deflateNeeded = shouldDeflate(\
                                 deflationState=deflationState,\
                                 deflationChangeTime=deflationStateTime,\
-                                inflationState=inflationState,\
+                                inflationState=inflateNeeded,\
                                 inflationChangeTime=inflationStateTime,\
                                 tankPressure=tankPressure
                                 )
@@ -293,8 +293,16 @@ def shouldDeflate(deflationState:bool, inflationState:bool, deflationChangeTime:
         condition2 = (datetime.now() - deflationChangeTime).total_seconds() > 60 
         condition3 = not inflationState
         condition4 = (datetime.now() - inflationChangeTime).total_seconds() > 60
+        if writeVoltageToOutputs:
+            message = f'Evaluation to start deflation: (C1 = {condition1} and C2 = {condition2} and C3 = {condition3} and C4 = {condition4}) = {(condition1 and condition2 and condition3 and condition4)}'
+            print(message)
+            logging.debug(message)
         return condition1 and condition2 and condition3 and condition4
     else:
+        if writeVoltageToOutputs:
+            message = f'Evaluation to end deflation: (tankPressure({tankPressure}) <= DEF_CLOSE_PRESSURE({DEF_CLOSE_PRESSURE})) = {(tankPressure <= DEF_CLOSE_PRESSURE)}'
+            print(message)
+            logging.debug(message)
         return tankPressure <= DEF_CLOSE_PRESSURE
 
 
