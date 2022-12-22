@@ -303,7 +303,7 @@ def shouldDeflate(deflationState:bool, inflationState:bool, deflationChangeTime:
             message = f'Evaluation to end deflation: (tankPressure({tankPressure}) <= DEF_CLOSE_PRESSURE({DEF_CLOSE_PRESSURE})) = {(tankPressure <= DEF_CLOSE_PRESSURE)}'
             print(message)
             logging.debug(message)
-        return tankPressure <= DEF_CLOSE_PRESSURE
+        return not (tankPressure <= DEF_CLOSE_PRESSURE)
 
 
 def shouldWarn():
