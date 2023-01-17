@@ -308,6 +308,16 @@ def shouldDeflate(deflationState:bool, inflationState:bool, deflationChangeTime:
 
 def shouldWarn():
     # TODO: This method determine if the inflation should be opened
+    '''
+    For warning
+    If not warning, any of the following conditions must be met to start warning:
+        1) pressureTank is less then SET_PRESSURE * 0.9
+        2) pressureTank has dropped by 1.5psi or more in the last 3sec
+    Else stop warning if all of the following conditions are met:
+        1) pressureTank is more then SET_PRESSURE * 0.9
+        2) pressureTank has not dropped by 1.5psi or more in the last 3sec
+        3) The warning light has been on for more then 60 sec
+    '''
     pass
 
 
