@@ -23,6 +23,7 @@ warningLightTime = datetime.now()
 upstreamPressure = 0.0  # P_u This will be the calculated upstream pressure in [PSI]
 downstreamPressure = 0.0  # P_d This will be the calculated downstream pressure in [PSI]
 tankPressure = 0.0  # P_t This will be the calculated tank pressure in [PSI]
+tankPressureLastThreeSecounds = list()  # This list of tupels contains the time and values of the last thee secounds of tankPressure
 
 # outputs
 digitalOutputs = list()
@@ -90,6 +91,8 @@ def onVoltageChange(self: VoltageInput, voltage):
                     CORRECTION_CONST2 * upstreamPressure + CORRECTION_CONST3
             else:
                 tankPressure = downstreamPressure
+            # Add latest value to the list of tankpressures
+            tankPressureLastThreeSecounds.append([datetime.now(), tankPressure])
         except PhidgetException as ex:
             traceback.print_exc()
             msg = "PhidgetException " + str(ex.code) + " (" + ex.description + "): " + ex.details
@@ -135,8 +138,8 @@ def onVoltageChange(self: VoltageInput, voltage):
                 solenoidToggle(deflationSolenoid, deflateNeeded)
             
             
-            # TODO: Determine if the warning light should be on
-            warningLightNeeded = tankPressure < SET_PRESSURE*0.9
+            # Determine if the warning light should be on
+            warningLightNeeded = shouldWarn(warnState=lightState, warnTimeChange=warningLightTime, tankPressure=tankPressure)
             solenoidToggle(warningLight, warningLightNeeded)
 
             # Output pressure values to match the read to the extra VINT ports
@@ -306,8 +309,7 @@ def shouldDeflate(deflationState:bool, inflationState:bool, deflationChangeTime:
         return not (tankPressure <= DEF_CLOSE_PRESSURE)
 
 
-def shouldWarn():
-    # TODO: This method determine if the inflation should be opened
+def shouldWarn(warnState:bool, warnTimeChange:datetime, tankPressure:float) -> bool:
     '''
     For warning
     If not warning, any of the following conditions must be met to start warning:
@@ -318,7 +320,23 @@ def shouldWarn():
         2) pressureTank has not dropped by 1.5psi or more in the last 3sec
         3) The warning light has been on for more then 60 sec
     '''
-    pass
+    if not warnState:
+        condition1 = tankPressure < SET_PRESSURE * 0.9
+        condition2 = evaluatePressureDropRate()
+
+        message = f'Evaluation to start warning (C1({condition1}) or C2({condition2}) = {condition1 or condition2})'
+        print(message)
+        logging.debug(message)
+        return condition1 or condition2
+    else:
+        condition1 = tankPressure > SET_PRESSURE * 0.9
+        condition2 = not evaluatePressureDropRate()
+        condition3 = (datetime.now() - warnTimeChange).total_seconds() > 60
+        
+        message = f'Evaluation to end warning (C1({condition1}) and C2({condition2}) and C3({condition3}) = {condition1 and condition2 and condition3})'
+        print(message)
+        logging.debug(message)
+        return condition1 and condition2 and condition3
 
 
 def writeOutputs(upstream:float, downstream:float, tank:float):
@@ -340,6 +358,30 @@ def writeOutputs(upstream:float, downstream:float, tank:float):
             outTank.setDutyCycle(0.0)
     except:
         pass
+
+
+def evaluatePressureDropRate() -> bool:
+    # This returns true if the pressureTank has dropped by 1.5psi or more in the last 3sec
+    global tankPressureLastThreeSecounds
+    global tankPressure
+    # Get current time
+    time = datetime.now()
+    # Find all indexes that are older then three secounds
+    rmvn = list()  # This is the list of indxest that need to be removed
+    n = 0
+    for recordedPressure in tankPressureLastThreeSecounds:
+        if (time - recordedPressure[0]) > 3:
+            rmvn.append(n)
+        n += 1
+    # Remove all indexes that have been identivied
+    for i in sorted(rmvn, reverse=True):
+        del tankPressureLastThreeSecounds[i]
+    # Pull the oldest value
+    oldestPressure = tankPressureLastThreeSecounds[0]
+
+    # Return true if the slope of pressure is less then -1.5psi / 3sec
+    actualSlope = (tankPressure - oldestPressure[1]) / (time - oldestPressure[0])
+    return (actualSlope <= -0.5)
 # endregion Helper Functions -------------------------------------------------
 
 # region Programing Routines -------------------------------------------------

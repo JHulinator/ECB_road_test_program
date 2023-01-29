@@ -1,0 +1,6 @@
+root - INFO - Program started at: 2023-01-29 16:42:55.502612 with args: ['c:/Users/J Hulin/Documents/Projects/PSI ECB Road Test/ECB_road_test_program/ecb-road-test.py']
+root - CRITICAL - PhidgetException 3 (Timed Out): No matching devices were found to open. Make sure your device is attached, and that your addressing parameters are specified correctly. If your Phidget has a plug or terminal block for external power, ensure it is plugged in and powered.
+root - INFO - Program ended at: 2023-01-29 16:43:00.537607
+root - INFO - Program started at: 2023-01-29 16:43:42.635413 with args: ['c:/Users/J Hulin/Documents/Projects/PSI ECB Road Test/ECB_road_test_program/ecb-road-test.py']
+root - CRITICAL - PhidgetException 3 (Timed Out): No matching devices were found to open. Make sure your device is attached, and that your addressing parameters are specified correctly. If your Phidget has a plug or terminal block for external power, ensure it is plugged in and powered.
+root - INFO - Program ended at: 2023-01-29 16:43:47.658893
